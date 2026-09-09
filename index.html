@@ -101,7 +101,7 @@
     <!-- Scrambled & Obfuscated JavaScript Engine -->
     <script>
         const _0x1a = atob('aHR0cHM6Ly9ncC13b3JrLm9ucmVuZGVyLmNvbQ=='); // Hidden API URL
-        const _0x2b = 'gp@2026'; // Change your portal password here
+        const _0x2b = 'gp@2026'; // Portal password
 
         const _s0 = document.getElementById('_auth_gate');
         const _s1 = document.getElementById('_auth_form');
@@ -139,16 +139,18 @@
         async function _fn_chk() {
             try {
                 const _r = await fetch(_0x1a + '/health');
+                const _json = await _r.json();
                 if (_r.ok) {
                     _d0.className = 'w-2.5 h-2.5 rounded-full bg-green-500';
-                    _d1.textContent = 'API Online';
+                    // Display the actual response body JSON in the health badge
+                    _d1.textContent = 'Health Response: ' + JSON.stringify(_json);
                     _d2.className = 'flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full text-xs font-medium text-green-700 border border-green-200';
                 } else {
-                    throw new Error();
+                    throw new Error('Status: ' + _r.status);
                 }
             } catch (_err) {
                 _d0.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
-                _d1.textContent = 'API Offline';
+                _d1.textContent = 'Health Error: ' + _err.message;
                 _d2.className = 'flex items-center space-x-2 bg-red-50 px-3 py-1.5 rounded-full text-xs font-medium text-red-700 border border-red-200';
             }
         }
@@ -240,4 +242,3 @@
     </script>
 </body>
 </html>
-
