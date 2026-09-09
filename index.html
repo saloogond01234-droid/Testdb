@@ -93,143 +93,170 @@
     </footer>
 
     <!-- JavaScript Logic -->
-    <script>
-        const API_BASE = 'https://gp-work.onrender.com';
+                            <script>
+    const API_BASE = 'https://gp-work.onrender.com';
 
-        // Elements
-        const healthDot = document.getElementById('health-dot');
-        const healthText = document.getElementById('health-text');
-        const healthStatusDiv = document.getElementById('health-status');
-        const searchForm = document.getElementById('search-form');
-        const mobileInput = document.getElementById('mobile-input');
-        const searchBtn = document.getElementById('search-btn');
-        const loadingSpinner = document.getElementById('loading');
-        const errorBox = document.getElementById('error-box');
-        const errorMessage = document.getElementById('error-message');
-        const resultsContainer = document.getElementById('results-container');
-        const emptyState = document.getElementById('empty-state');
-        const resultCount = document.getElementById('result-count');
+    const healthDot = document.getElementById('health-dot');
+    const healthText = document.getElementById('health-text');
+    const healthStatusDiv = document.getElementById('health-status');
+    const searchForm = document.getElementById('search-form');
+    const mobileInput = document.getElementById('mobile-input');
+    const searchBtn = document.getElementById('search-btn');
+    const loadingSpinner = document.getElementById('loading');
+    const errorBox = document.getElementById('error-box');
+    const errorMessage = document.getElementById('error-message');
+    const resultsContainer = document.getElementById('results-container');
+    const emptyState = document.getElementById('empty-state');
+    const resultCount = document.getElementById('result-count');
 
-        // Check Health on Load
-        async function checkHealth() {
-            try {
-                const response = await fetch(`${API_BASE}/health`);
-                if (response.ok) {
-                    healthDot.className = 'w-2.5 h-2.5 rounded-full bg-green-500';
-                    healthText.textContent = 'API Online';
-                    healthStatusDiv.className = 'flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full text-xs font-medium text-green-700 border border-green-200';
-                } else {
-                    throw new Error('Unhealthy status');
-                }
-            } catch (error) {
-                healthDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
-                healthText.textContent = 'API Offline / Unreachable';
-                healthStatusDiv.className = 'flex items-center space-x-2 bg-red-50 px-3 py-1.5 rounded-full text-xs font-medium text-red-700 border border-red-200';
+    async function checkHealth() {
+        try {
+            const response = await fetch(`${API_BASE}/health`);
+            if (response.ok) {
+                healthDot.className = 'w-2.5 h-2.5 rounded-full bg-green-500';
+                healthText.textContent = 'API Online';
+                healthStatusDiv.className = 'flex items-center space-x-2 bg-green-50 px-3 py-1.5 rounded-full text-xs font-medium text-green-700 border border-green-200';
+            } else {
+                throw new Error('Unhealthy status');
             }
+        } catch (error) {
+            healthDot.className = 'w-2.5 h-2.5 rounded-full bg-red-500';
+            healthText.textContent = 'API Offline / Unreachable';
+            healthStatusDiv.className = 'flex items-center space-x-2 bg-red-50 px-3 py-1.5 rounded-full text-xs font-medium text-red-700 border border-red-200';
+        }
+    }
+
+    checkHealth();
+
+    searchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const queryValue = mobileInput.value.trim();
+
+        if (!queryValue) {
+            showError('Please enter a mobile number or search query.');
+            return;
         }
 
-        checkHealth();
+        hideError();
+        emptyState.classList.add('hidden');
+        resultsContainer.innerHTML = '';
+        loadingSpinner.classList.remove('hidden');
+        searchBtn.disabled = true;
 
-        // Handle Search Form Submit
-        searchForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const queryValue = mobileInput.value.trim();
+        try {
+            const url = `${API_BASE}/search?mobile=${encodeURIComponent(queryValue)}`;
+            const response = await fetch(url);
 
-            if (!queryValue) {
-                showError('Please enter a mobile number or search query.');
-                return;
+            if (!response.ok) {
+                throw new Error(`Server returned error status: ${response.status}`);
             }
 
-            hideError();
-            emptyState.classList.add('hidden');
-            resultsContainer.innerHTML = '';
-            loadingSpinner.classList.remove('hidden');
-            searchBtn.disabled = true;
-
-            try {
-                // Call GET /search?mobile=...
-                const url = `${API_BASE}/search?mobile=${encodeURIComponent(queryValue)}`;
-                const response = await fetch(url);
-
-                if (!response.ok) {
-                    throw new Error(`Server returned error status: ${response.status}`);
+            const data = await response.json();
+            console.log("API Response:", data); // Check F12 Console if issues persist
+            
+            let records = [];
+            if (Array.isArray(data)) {
+                records = data;
+            } else if (data && typeof data === 'object') {
+                // Check common wrapper keys used in APIs
+                const wrapperKeys = ['data', 'results', 'result', 'items', 'records', 'payload'];
+                let extracted = false;
+                
+                for (const key of wrapperKeys) {
+                    if (data[key]) {
+                        if (Array.isArray(data[key])) {
+                            records = data[key];
+                            extracted = true;
+                            break;
+                        } else if (typeof data[key] === 'object') {
+                            records = [data[key]];
+                            extracted = true;
+                            break;
+                        }
+                    }
                 }
 
-                const data = await response.json();
-                
-                // Handle different response formats (array of objects or single object/wrapped results)
-                let records = [];
-                if (Array.isArray(data)) {
-                    records = data;
-                } else if (data && typeof data === 'object') {
-                    // Check if there is an inner array (e.g. data.results or data.data)
+                if (!extracted) {
+                    // Fallback: search for any property that is an array
                     const potentialArrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
                     if (potentialArrayKey) {
                         records = data[potentialArrayKey];
                     } else {
-                        records = [data]; // Single object result
+                        records = [data];
                     }
                 }
-
-                renderResults(records);
-
-            } catch (err) {
-                showError(`Failed to fetch details: ${err.message}`);
-                resultCount.textContent = '0 found';
-                emptyState.classList.remove('hidden');
-            } finally {
-                loadingSpinner.classList.add('hidden');
-                searchBtn.disabled = false;
-            }
-        });
-
-        function renderResults(records) {
-            resultsContainer.innerHTML = '';
-            if (!records || records.length === 0) {
-                resultCount.textContent = '0 found';
-                emptyState.classList.remove('hidden');
-                return;
             }
 
-            resultCount.textContent = `${records.length} found`;
+            renderResults(records);
 
-            records.forEach(record => {
-                const card = document.createElement('div');
-                card.className = 'bg-white rounded-xl shadow-md border border-gray-200 p-5 flex flex-col justify-between hover:shadow-lg transition';
+        } catch (err) {
+            showError(`Failed to fetch details: ${err.message}`);
+            resultCount.textContent = '0 found';
+            emptyState.classList.remove('hidden');
+        } finally {
+            loadingSpinner.classList.add('hidden');
+            searchBtn.disabled = false;
+        }
+    });
 
-                let fieldsHtml = '';
-                for (const [key, value] of Object.entries(record)) {
-                    fieldsHtml += `
-                        <div class="flex justify-between py-1.5 border-b border-gray-100 text-sm">
-                            <span class="font-medium text-gray-500 capitalize">${key.replace(/_/g, ' ')}</span>
-                            <span class="text-gray-900 font-semibold text-right break-all ml-2">${value !== null ? value : '<span class="text-gray-400 italic">N/A</span>'}</span>
-                        </div>
-                    `;
-                }
+    function formatValue(value) {
+        if (value === null || value === undefined) {
+            return '<span class="text-gray-400 italic">N/A</span>';
+        }
+        if (typeof value === 'object') {
+            return `<pre class="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto text-gray-800">${JSON.stringify(value, null, 2)}</pre>`;
+        }
+        return `<span class="text-gray-900 font-semibold">${value}</span>`;
+    }
 
-                card.innerHTML = `
-                    <div>
-                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
-                            <span class="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded">User Record</span>
-                        </div>
-                        <div class="space-y-1">
-                            ${fieldsHtml}
-                        </div>
+    function renderResults(records) {
+        resultsContainer.innerHTML = '';
+        if (!records || records.length === 0) {
+            resultCount.textContent = '0 found';
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        resultCount.textContent = `${records.length} found`;
+
+        records.forEach(record => {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-xl shadow-md border border-gray-200 p-5 flex flex-col justify-between hover:shadow-lg transition';
+
+            let fieldsHtml = '';
+            for (const [key, value] of Object.entries(record)) {
+                fieldsHtml += `
+                    <div class="py-2 border-b border-gray-100 text-sm">
+                        <div class="font-medium text-gray-500 uppercase text-xs tracking-wider">${key.replace(/_/g, ' ')}</div>
+                        <div class="mt-0.5 break-all">${formatValue(value)}</div>
                     </div>
                 `;
-                resultsContainer.appendChild(card);
-            });
-        }
+            }
 
-        function showError(message) {
-            errorMessage.textContent = message;
-            errorBox.classList.remove('hidden');
-        }
+            card.innerHTML = `
+                <div>
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+                        <span class="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded">User Record</span>
+                    </div>
+                    <div class="space-y-1">
+                        ${fieldsHtml}
+                    </div>
+                </div>
+            `;
+            resultsContainer.appendChild(card);
+        });
+    }
 
-        function hideError() {
-            errorBox.classList.add('hidden');
-        }
-    </script>
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorBox.classList.remove('hidden');
+    }
+
+    function hideError() {
+        errorBox.classList.add('hidden');
+    }
+</script>
+
 </body>
 </html>
 
